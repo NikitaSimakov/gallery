@@ -1,5 +1,8 @@
 .container {
   padding: 0 20px;
+  & > p {
+    text-align: center;
+  }
 }
 
 .photo_grid {

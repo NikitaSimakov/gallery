@@ -1,26 +1,29 @@
-import React, { useState, useEffect } from 'react';
-import { useParams, useSearchParams } from 'react-router-dom';
+import React, { useEffect } from 'react';
+import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
+import { observer } from 'mobx-react-lite';
 import Modal from './Modal';
-import usePagination from '../hooks/usePagination';
-import css from './Album.module.scss';
 import Pagination from './Pagination';
+import albumStore from '../store/albumStore';
+import css from './Album.module.scss';
 import axios from 'axios';
 
-const Album = () => {
+const Album = observer(() => {
+  const navigate = useNavigate();
   const { id } = useParams();
   const [searchParams, setSearchParams] = useSearchParams();
   const pageSize = 12;
-  const [title, setTitle] = useState({ title: '', description: '' });
+  const page = Number(searchParams.get('page')) || 1
 
-  const {
-    data: photos,
-    totalPages,
-    currentPage,
-    setCurrentPage,
-    loading,
-  } = usePagination(`${process.env.REACT_APP_DIRECTUS_URL}/items/photos?filter[album][_eq]=${id}`, pageSize);
+
+  useEffect(() => {
+    albumStore.setCurrentPage(page);
+    albumStore.fetchPhotos(id, pageSize, page);
+    albumStore.fetchAlbumDetails(id);
+  }, [id, page]);
 
   const openModal = (photoId) => {
+    const photo = albumStore.photos.find(photo => photo.id === photoId);
+    albumStore.setModalPhoto(photo);
     searchParams.set('modal', photoId);
     setSearchParams(searchParams);
   };
@@ -28,41 +31,41 @@ const Album = () => {
   const closeModal = () => {
     searchParams.delete('modal');
     setSearchParams(searchParams);
+    albumStore.clearModalPhoto();
   };
 
   const selectedPhotoId = searchParams.get('modal');
-  const selectedPhoto = photos.find(photo => photo.id === parseInt(selectedPhotoId));
+  const selectedPhoto = albumStore.modalPhoto;
 
   useEffect(() => {
     if (selectedPhotoId && !selectedPhoto) {
       const fetchPhoto = async () => {
-        const response = await axios.get(`${process.env.REACT_APP_DIRECTUS_URL}/items/photos/${selectedPhotoId}`);
-
-        if (response.data.data) {
-          openModal(response.data.data.id);
+        try {
+          const response = await axios.get(`${process.env.REACT_APP_DIRECTUS_URL}/items/photos/${selectedPhotoId}`);
+          if (response.data.data) {
+            albumStore.setModalPhoto(response.data.data);
+            const photo = albumStore.photos.find(photo => photo.id === response.data.data.id);
+            albumStore.setModalPhoto(photo);
+          }
+        } catch (error) {
+          console.error('Error fetching selected photo:', error);
         }
       };
       fetchPhoto();
     }
-  }, [selectedPhotoId, selectedPhoto, setSearchParams]);
+  }, [selectedPhotoId, selectedPhoto]);
 
-  useEffect(() => {
-    const fetchTitle = async () => {
-      const { data: { data } } = await axios.get(`${process.env.REACT_APP_DIRECTUS_URL}/items/albums/${id}`);
-      setTitle({ title: data.title, description: data.description })
-    }
-    fetchTitle()
-  }, [id, setSearchParams])
   return (
     <div className={css.container}>
-      <h1>{title.title}</h1>
-      {title.description && <p>{title.description}</p>}
-      {loading ? (
+      <button onClick={() => navigate('/')} >к альбомам</button>
+      <h1>{albumStore.albumDetails.title}</h1>
+      {albumStore.albumDetails.description && <p>{albumStore.albumDetails.description}</p>}
+      {albumStore.loading ? (
         <p>Loading...</p>
       ) : (
         <>
           <ul className={css.photo_grid}>
-            {photos.map(photo => (
+            {albumStore.photos.map(photo => (
               <li className={css.photo_container} key={photo.id} onClick={() => openModal(photo.id)}>
                 <img
                   src={`${process.env.REACT_APP_DIRECTUS_URL}/assets/${photo.url}?transform=resize&width=535&height=300`}
@@ -71,12 +74,20 @@ const Album = () => {
               </li>
             ))}
           </ul>
-          <Pagination setCurrentPage={setCurrentPage} currentPage={currentPage} totalPages={totalPages} />
+          <Pagination
+            setCurrentPage={(page) => {
+              albumStore.setCurrentPage(page);
+              searchParams.set('page', page);
+              setSearchParams(searchParams);
+            }}
+            currentPage={albumStore.currentPage}
+            totalPages={albumStore.totalPages}
+          />
         </>
       )}
-      {selectedPhoto && <Modal photo={selectedPhoto} photos={photos} closeModal={closeModal} />}
+      {albumStore.modalPhoto && <Modal closeModal={closeModal} />}
     </div>
   );
-};
+});
 
 export default Album;

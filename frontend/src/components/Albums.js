@@ -1,28 +1,35 @@
-import React, { useEffect, useState } from 'react';
-import axios from 'axios';
+import React, { useEffect } from 'react';
+import { observer } from 'mobx-react-lite';
 import { Link } from 'react-router-dom';
+import albumStore from '../store/albumStore';
+import css from './Albums.module.scss';
+import { FaFolder } from 'react-icons/fa';
 
-const Albums = () => {
-  const [albums, setAlbums] = useState([]);
-
+const Albums = observer(() => {
   useEffect(() => {
-    axios.get(`${process.env.REACT_APP_DIRECTUS_URL}/items/albums`)
-      .then(response => setAlbums(response.data.data))
-      .catch(error => console.error('Error fetching albums:', error));
+    albumStore.fetchAlbums();
   }, []);
 
+  if (albumStore.loadingAlbums) {
+    return <p>Loading...</p>;
+  }
+
   return (
-    <div>
+    <div className={css.container}>
       <h1>Albums</h1>
-      <ul>
-        {albums.map(album => (
-          <li key={album.id}>
-            <Link to={`/album/${album.id}`}>{album.title}</Link>
+      <ul className={css.album_list}>
+        {albumStore.albums?.map(album => (
+          <li key={album.id} className={css.album_item}>
+            <Link to={`/album/${album.id}`} className={css.album_link}>
+              <FaFolder className={css.icon} />
+              <h3>{album.title}</h3>
+              <p>{album.description}</p>
+            </Link>
           </li>
         ))}
       </ul>
     </div>
   );
-};
+});
 
 export default Albums;
