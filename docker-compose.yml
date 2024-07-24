@@ -1,0 +1,37 @@
+version: "3.8"
+services:
+  directus:
+    image: directus/directus:latest
+    ports:
+      - 8055:8055
+    volumes:
+      - ./directus/database:/directus/database
+      - ./directus/uploads:/directus/uploads
+    env_file:
+      - ./directus/.env
+    environment:
+      KEY: "replace-with-random-value"
+      SECRET: "replace-with-random-value"
+      ADMIN_EMAIL: "admin@admin.com"
+      ADMIN_PASSWORD: "adminpassword"
+      DB_CLIENT: "sqlite3"
+      DB_FILENAME: "/directus/database/data.db"
+      REACT_APP_DIRECTUS_URL: http://localhost:8055
+      WEBSOCKETS_ENABLED: true
+      CORS_ENABLED: "true"
+      CORS_ORIGIN: "*"
+      CORS_METHODS: GET,POST,PATCH,DELETE
+
+  frontend:
+    build:
+      context: ./frontend
+      args:
+        REACT_APP_DIRECTUS_URL: "http://localhost:8055"
+    ports:
+      - "3000:80"
+    depends_on:
+      - directus
+    environment:
+      - REACT_APP_DIRECTUS_URL=http://localhost:8055
+    env_file:
+      - ./frontend/.env
